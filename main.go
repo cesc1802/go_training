@@ -5,8 +5,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/manabie-com/togo/internal/services"
-	sqllite "github.com/manabie-com/togo/internal/storages/sqlite"
+	"github.com/cesc1802/go_training/internal/services"
+	sqllite "github.com/cesc1802/go_training/internal/storages/sqlite"
 
 	_ "github.com/mattn/go-sqlite3"
 )
