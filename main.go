@@ -1,26 +1,33 @@
 package main
 
 import (
-	"database/sql"
 	"log"
-	"net/http"
-
-	"github.com/cesc1802/go_training/internal/services"
-	sqllite "github.com/cesc1802/go_training/internal/storages/sqlite"
-
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/cesc1802/go_training/internal/route"
+	"github.com/cesc1802/go_training/internal/storages"
 )
 
+
 func main() {
-	db, err := sql.Open("sqlite3", "./data.db")
-	if err != nil {
-		log.Fatal("error opening db", err)
+	db := storages.Get()
+	// create database
+	storages.Migration(db)
+
+	testUser := &storages.User{
+		ID: "firstUser",
+		Password: "example",
+		MaxTodo: 5,
 	}
 
-	http.ListenAndServe(":5050", &services.ToDoService{
-		JWTKey: "wqGyEBBfPK9w3Lxw",
-		Store: &sqllite.LiteDB{
-			DB: db,
-		},
-	})
+	// check default user exist
+	user := &storages.User{}
+	db.Where("id = ?", testUser.ID).First(&user)
+
+	if user.ID != "firstUser" {
+		userRepo := storages.NewUserRepo()
+		userRepo.Save(testUser)
+	} else {
+		log.Println("Exist")
+	}
+	
+	route.SetupRoutes(db)
 }
