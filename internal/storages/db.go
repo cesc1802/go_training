@@ -5,11 +5,18 @@ import (
 	"gorm.io/gorm"
 )
 
-func Get() *gorm.DB {
+var MysqlDB *gorm.DB
+
+func Connect() *gorm.DB {
 	dsn := "thai1201:thai1201@tcp(127.0.0.1:6033)/go_training?charset=utf8mb4&parseTime=True&loc=Local"
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		panic("cannot connect database")
 	}
-	return db
+	MysqlDB = db
+	return MysqlDB
+}
+
+func Get() *gorm.DB {
+	return MysqlDB
 }

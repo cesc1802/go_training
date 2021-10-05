@@ -1,21 +1,20 @@
 package main
 
 import (
-	"log"
 	"github.com/cesc1802/go_training/internal/route"
 	"github.com/cesc1802/go_training/internal/storages"
+	"log"
 )
 
-
 func main() {
-	db := storages.Get()
+	db := storages.Connect()
 	// create database
 	storages.Migration(db)
 
 	testUser := &storages.User{
-		ID: "firstUser",
+		ID:       "firstUser",
 		Password: "example",
-		MaxTodo: 5,
+		MaxTodo:  5,
 	}
 
 	// check default user exist
@@ -28,6 +27,6 @@ func main() {
 	} else {
 		log.Println("Exist")
 	}
-	
+
 	route.SetupRoutes(db)
 }

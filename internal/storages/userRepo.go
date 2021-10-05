@@ -1,9 +1,8 @@
 package storages
 
 import (
-	"log"
-
 	"golang.org/x/crypto/bcrypt"
+	"log"
 )
 
 type UserRepo interface {
@@ -21,7 +20,7 @@ func (uR userRepo) Save(u *User) *User {
 	db := Get()
 	hashedPwd, err := bcrypt.GenerateFromPassword([]byte(u.Password), 14)
 	if err != nil {
-		log.Println(err)	
+		log.Println(err)
 	}
 	u.Password = string(hashedPwd)
 	db.Create(u)

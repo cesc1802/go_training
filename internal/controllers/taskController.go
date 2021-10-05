@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"net/http"
-	"strings"
 
 	dto_request "github.com/cesc1802/go_training/internal/dto/requests"
 	"github.com/cesc1802/go_training/internal/services"
@@ -14,27 +13,31 @@ type taskController struct{}
 
 func (tc taskController) Routes(r *gin.Engine) {
 	r.POST("/tasks", createTask)
+	r.PATCH("/tasks/:id", updateTask)
 }
 
 func createTask(c *gin.Context) {
 	var task dto_request.Task
 	c.BindJSON(&task)
 	user := c.MustGet("USER").(storages.User)
-
-	var contentInDay int
-	var sb strings.Builder
-	sb.WriteString("SELECT COUNT(*) FROM tasks ")
-	sb.WriteString("JOIN users ON users.id = tasks.user_id ")
-	sb.WriteString("WHERE CAST(tasks.created_at AS DATE) = CURRENT_DATE()")
-	storages.Get().Raw(sb.String()).Scan(&contentInDay)
-	if contentInDay > user.MaxTodo {
-		c.String(http.StatusBadRequest, "Max todo in day")
-		c.Abort()
-		return
+	result, err := services.CreateTask(c, &task, user)
+	if err != nil {
+		c.String(http.StatusBadRequest, "")
+	} else {
+		c.JSON(http.StatusCreated, result)
 	}
-	result := services.CreateTask(&task, user)
-	c.JSON(http.StatusCreated, result)
 }
+
+func updateTask(c *gin.Context) {
+	task := services.UpdateContent(c)	
+	if task != (&storages.Task{}) {
+		c.String(http.StatusBadRequest, "")
+		c.Abort()
+	}
+	c.JSON(http.StatusAccepted, task)
+}
+
+
 
 func TaskController() taskController {
 	return taskController{}
