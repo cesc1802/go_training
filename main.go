@@ -2,24 +2,25 @@ package main
 
 import (
 	"database/sql"
-	"log"
+	"fmt"
+	mysql "github.com/cesc1802/go_training/internal/storages/mysql"
 	"net/http"
 
 	"github.com/cesc1802/go_training/internal/services"
-	sqllite "github.com/cesc1802/go_training/internal/storages/sqlite"
-
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 func main() {
-	db, err := sql.Open("sqlite3", "./data.db")
+	//mysql
+	db, err := sql.Open("mysql", "root:1234@tcp(127.0.0.1:3306)/dataTest?charset=utf8")
+	defer db.Close()
 	if err != nil {
-		log.Fatal("error opening db", err)
+		fmt.Println("Status:", err)
 	}
-
-	http.ListenAndServe(":5050", &services.ToDoService{
+	defer db.Close()
+	http.ListenAndServe(":5050", &services.ToDoServiceMySQL{
 		JWTKey: "wqGyEBBfPK9w3Lxw",
-		Store: &sqllite.LiteDB{
+		Store: &mysql.MySQLDB{
 			DB: db,
 		},
 	})

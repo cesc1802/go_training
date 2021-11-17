@@ -4,7 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	sqllite "github.com/cesc1802/go_training/internal/storages/sqlite"
+
+	mysql "github.com/cesc1802/go_training/internal/storages/mysql"
 	"log"
 	"net/http"
 	"time"
@@ -14,13 +15,13 @@ import (
 	"github.com/google/uuid"
 )
 
-// ToDoService implement HTTP server
-type ToDoService struct {
+// ToDoServiceMySQL implement HTTP server
+type ToDoServiceMySQL struct {
 	JWTKey string
-	Store  *sqllite.LiteDB
+	Store  *mysql.MySQLDB
 }
 
-func (s *ToDoService) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+func (s *ToDoServiceMySQL) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	log.Println(req.Method, req.URL.Path)
 	resp.Header().Set("Access-Control-Allow-Origin", "*")
 	resp.Header().Set("Access-Control-Allow-Headers", "*")
@@ -53,9 +54,10 @@ func (s *ToDoService) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (s *ToDoService) getAuthToken(resp http.ResponseWriter, req *http.Request) {
-	id := value(req, "user_id")
-	if !s.Store.ValidateUser(req.Context(), id, value(req, "password")) {
+func (s *ToDoServiceMySQL) getAuthToken(resp http.ResponseWriter, req *http.Request) {
+	id := valueMySQL(req, "user_id")
+	password := valueMySQL(req, "password")
+	if !s.Store.ValidateUser(req.Context(), id, password) {
 		resp.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(resp).Encode(map[string]string{
 			"error": "incorrect user_id/pwd",
@@ -78,15 +80,15 @@ func (s *ToDoService) getAuthToken(resp http.ResponseWriter, req *http.Request) 
 	})
 }
 
-func (s *ToDoService) listTasks(resp http.ResponseWriter, req *http.Request) {
-	id, _ := userIDFromCtx(req.Context())
+func (s *ToDoServiceMySQL) listTasks(resp http.ResponseWriter, req *http.Request) {
+	id, _ := userIDFromCtxMySQL(req.Context())
 	tasks, err := s.Store.RetrieveTasks(
 		req.Context(),
 		sql.NullString{
 			String: id,
 			Valid:  true,
 		},
-		value(req, "created_date"),
+		valueMySQL(req, "created_date"),
 	)
 
 	resp.Header().Set("Content-Type", "application/json")
@@ -104,7 +106,7 @@ func (s *ToDoService) listTasks(resp http.ResponseWriter, req *http.Request) {
 	})
 }
 
-func (s *ToDoService) addTask(resp http.ResponseWriter, req *http.Request) {
+func (s *ToDoServiceMySQL) addTask(resp http.ResponseWriter, req *http.Request) {
 	t := &storages.Task{}
 	err := json.NewDecoder(req.Body).Decode(t)
 	defer req.Body.Close()
@@ -114,22 +116,22 @@ func (s *ToDoService) addTask(resp http.ResponseWriter, req *http.Request) {
 	}
 
 	now := time.Now()
-	userID, _ := userIDFromCtx(req.Context())
+	userID, _ := userIDFromCtxMySQL(req.Context())
 	t.ID = uuid.New().String()
 	t.UserID = userID
 	t.CreatedDate = now.Format("2006-01-02")
 
 	maxTask := 9
 
-	numberTasks, ok := s.numberTaskInDay(resp, req)
-	if ok != nil {
+	numberTasks, errTasks := s.numberTaskInDay(req)
+	if errTasks != nil {
 		resp.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(resp).Encode(map[string]string{
 			"error": err.Error(),
 		})
 		return
 	}
-
+	// check tasks
 	if len(numberTasks) > maxTask {
 		resp.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(resp).Encode(map[string]string{
@@ -154,14 +156,14 @@ func (s *ToDoService) addTask(resp http.ResponseWriter, req *http.Request) {
 	})
 }
 
-func value(req *http.Request, p string) sql.NullString {
+func valueMySQL(req *http.Request, p string) sql.NullString {
 	return sql.NullString{
 		String: req.FormValue(p),
 		Valid:  true,
 	}
 }
 
-func (s *ToDoService) createToken(id string) (string, error) {
+func (s *ToDoServiceMySQL) createToken(id string) (string, error) {
 	atClaims := jwt.MapClaims{}
 	atClaims["user_id"] = id
 	atClaims["exp"] = time.Now().Add(time.Minute * 15).Unix()
@@ -173,7 +175,7 @@ func (s *ToDoService) createToken(id string) (string, error) {
 	return token, nil
 }
 
-func (s *ToDoService) validToken(req *http.Request) (*http.Request, bool) {
+func (s *ToDoServiceMySQL) validToken(req *http.Request) (*http.Request, bool) {
 	token := req.Header.Get("Authorization")
 
 	claims := make(jwt.MapClaims)
@@ -194,21 +196,21 @@ func (s *ToDoService) validToken(req *http.Request) (*http.Request, bool) {
 		return req, false
 	}
 
-	req = req.WithContext(context.WithValue(req.Context(), userAuthKey(0), id))
+	req = req.WithContext(context.WithValue(req.Context(), userAuthKeyMySQL(0), id))
 	return req, true
 }
 
-type userAuthKey int8
+type userAuthKeyMySQL int8
 
-func userIDFromCtx(ctx context.Context) (string, bool) {
-	v := ctx.Value(userAuthKey(0))
+func userIDFromCtxMySQL(ctx context.Context) (string, bool) {
+	v := ctx.Value(userAuthKeyMySQL(0))
 	id, ok := v.(string)
 	return id, ok
 }
 
-func (s *ToDoService) numberTaskInDay(resp http.ResponseWriter, req *http.Request) ([]string, error) {
-	id, _ := userIDFromCtx(req.Context())
-	date := value(req, "created_date")
+func (s *ToDoServiceMySQL) numberTaskInDay(req *http.Request) ([]string, error) {
+	id, _ := userIDFromCtxMySQL(req.Context())
+	date := valueMySQL(req, "created_date")
 	tasks, err := s.Store.RetrieveTasks(
 		req.Context(),
 		sql.NullString{
@@ -217,7 +219,6 @@ func (s *ToDoService) numberTaskInDay(resp http.ResponseWriter, req *http.Reques
 		},
 		date,
 	)
-
 	var listTasks []string
 	for i := range tasks {
 		listTasks = append(listTasks, tasks[i].CreatedDate)
